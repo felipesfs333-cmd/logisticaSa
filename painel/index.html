@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Painel Logístico</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #f7f4f2;
+    --panel: #ffffff;
+    --panel-2: #faf6f5;
+    --line: #ece2e0;
+    --txt: #2a1418;
+    --txt-dim: #9a8589;
+    --accent: #4b1018;
+    --accent-2: #8a2436;
+    --accent-soft: #f3e7e9;
+    --gold: #b08d57;
+    --warn: #c8861a;
+    --danger: #c0392b;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--txt);
+    font-family: 'Sora', sans-serif;
+    min-height: 100vh;
+    display: flex;
+  }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+
+  /* Sidebar */
+  aside {
+    width: 230px;
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    padding: 26px 16px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    flex-shrink: 0;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 34px; padding: 0 8px; }
+  .logo-mark {
+    width: 34px; height: 34px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: grid; place-items: center; font-weight: 800; color: #fff; font-size: 18px;
+  }
+  .logo h1 { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
+  .logo span { display: block; font-size: 10px; color: var(--txt-dim); font-weight: 400; letter-spacing: 1px; text-transform: uppercase; }
+  nav button {
+    width: 100%; text-align: left; background: none; border: none;
+    color: var(--txt-dim); font-family: inherit; font-size: 14px; font-weight: 600;
+    padding: 11px 14px; border-radius: 9px; cursor: pointer; margin-bottom: 3px;
+    display: flex; align-items: center; gap: 11px; transition: all .15s;
+  }
+  nav button:hover { background: var(--panel-2); color: var(--txt); }
+  nav button.active { background: var(--accent-soft); color: var(--accent); }
+  nav button .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .55; }
+
+  /* Main */
+  main { flex: 1; padding: 30px 38px; max-width: 1500px; }
+  .head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 26px; }
+  .head h2 { font-size: 25px; font-weight: 800; letter-spacing: -0.6px; }
+  .head p { color: var(--txt-dim); font-size: 13px; margin-top: 3px; }
+  .status-api { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--txt-dim); }
+  .status-api .led { width: 9px; height: 9px; border-radius: 50%; background: var(--danger); transition: background .3s; }
+  .status-api.on .led { background: var(--accent); box-shadow: 0 0 9px var(--accent); }
+
+  .view { display: none; animation: fade .35s ease; }
+  .view.active { display: block; }
+  @keyframes fade { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
+
+  /* Cards */
+  .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 20px;
+  }
+  .card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--txt-dim); margin-bottom: 11px; }
+  .card .value { font-size: 30px; font-weight: 800; letter-spacing: -1px; }
+  .card .sub { font-size: 12px; color: var(--txt-dim); margin-top: 6px; }
+  .card.pending { border-style: dashed; opacity: .72; }
+  .card.pending .value { color: var(--txt-dim); font-size: 16px; font-weight: 600; }
+  .badge-soon { display: inline-block; font-size: 9px; background: rgba(245,166,35,.15); color: var(--warn); padding: 3px 7px; border-radius: 5px; letter-spacing: .8px; margin-top: 9px; text-transform: uppercase; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .panel-box {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 22px; margin-bottom: 16px;
+  }
+  .panel-box h3 { font-size: 15px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 9px; }
+  .panel-box h3 .tag { font-size: 9px; background: var(--accent-soft); color: var(--accent); padding: 3px 7px; border-radius: 5px; letter-spacing: .8px; text-transform: uppercase; font-weight: 600; }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--txt-dim); padding: 10px 12px; border-bottom: 1px solid var(--line); font-weight: 600; }
+  td { padding: 13px 12px; border-bottom: 1px solid var(--line); font-size: 14px; }
+  tr:last-child td { border-bottom: none; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; padding: 4px 10px; border-radius: 20px; font-weight: 600; }
+  .pill.on { background: var(--accent-soft); color: var(--accent); }
+  .pill.off { background: #f4eceb; color: var(--txt-dim); }
+
+  .toggle { position: relative; width: 42px; height: 23px; background: var(--line); border-radius: 20px; cursor: pointer; transition: background .2s; border: none; }
+  .toggle.on { background: var(--accent); }
+  .toggle::after { content: ''; position: absolute; width: 17px; height: 17px; border-radius: 50%; background: #fff; top: 3px; left: 3px; transition: left .2s; }
+  .toggle.on::after { left: 22px; }
+
+  /* Simulador */
+  .sim-form { display: grid; grid-template-columns: repeat(3, 1fr) auto; gap: 13px; align-items: end; }
+  label.field { display: block; }
+  label.field span { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--txt-dim); margin-bottom: 7px; }
+  input, .btn {
+    width: 100%; background: var(--panel-2); border: 1px solid var(--line); color: var(--txt);
+    padding: 12px 14px; border-radius: 9px; font-family: inherit; font-size: 14px;
+  }
+  input:focus { outline: none; border-color: var(--accent); }
+  .btn {
+    background: var(--accent); color: #fff;
+    font-weight: 700; cursor: pointer; border: none; white-space: nowrap; width: auto; padding: 13px 24px;
+    transition: transform .12s, background .15s;
+  }
+  .btn:hover { transform: translateY(-1px); background: var(--accent-2); }
+  .btn:active { transform: translateY(0); }
+
+  .sim-results { margin-top: 22px; display: grid; gap: 11px; }
+  .sim-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 11px; padding: 16px 19px;
+    animation: fade .3s ease;
+  }
+  .sim-row.best { border-color: var(--accent); box-shadow: inset 0 0 0 1px rgba(75,16,24,.25); }
+  .sim-row .tname { font-weight: 700; font-size: 16px; }
+  .sim-row .tmeta { font-size: 12px; color: var(--txt-dim); margin-top: 3px; }
+  .sim-row .tprice { font-size: 22px; font-weight: 800; letter-spacing: -.5px; color: var(--accent); }
+  .flag { font-size: 9px; padding: 3px 8px; border-radius: 5px; letter-spacing: .8px; text-transform: uppercase; font-weight: 700; margin-left: 9px; }
+  .flag.cheap { background: var(--accent-soft); color: var(--accent); }
+  .flag.fast { background: #f0e9dc; color: var(--gold); }
+
+  .empty { text-align: center; padding: 40px; color: var(--txt-dim); font-size: 14px; }
+  .err { background: rgba(239,95,107,.1); border: 1px solid rgba(239,95,107,.3); color: var(--danger); padding: 14px; border-radius: 9px; font-size: 13px; margin-top: 14px; }
+  canvas { max-height: 280px; }
+  .loading { color: var(--txt-dim); font-size: 13px; padding: 20px; text-align: center; }
+
+  /* Edição por estado */
+  .toggle-link { background:none;border:1px solid var(--line);color:var(--txt-dim);font-family:inherit;font-size:12px;padding:6px 12px;border-radius:7px;cursor:pointer; }
+  .toggle-link:hover { color:var(--txt);border-color:var(--txt-dim); }
+  .row-link { color: var(--accent-2); cursor: pointer; font-size: 12px; background: none; border: none; font-family: inherit; font-weight: 600; }
+  .row-link:hover { text-decoration: underline; }
+  .mini-input { width: 78px; background: var(--panel-2); border: 1px solid var(--line); color: var(--txt); padding: 7px 9px; border-radius: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; }
+  .mini-input:focus { outline: none; border-color: var(--accent); }
+  .estado-grid { max-height: 460px; overflow-y: auto; }
+  .toggle.sm { width: 36px; height: 20px; }
+  .toggle.sm::after { width: 14px; height: 14px; }
+  .toggle.sm.on::after { left: 19px; }
+  .saved-flash { color: var(--accent); font-size: 11px; opacity: 0; transition: opacity .2s; }
+  .saved-flash.show { opacity: 1; }
+
+  /* Modal */
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; place-items: center; z-index: 50; }
+  .modal-bg.show { display: grid; }
+  .modal { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 28px; width: 420px; max-width: 90vw; }
+  .modal h3 { font-size: 18px; margin-bottom: 18px; }
+  .modal .actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+  .btn-ghost { background: none; border: 1px solid var(--line); color: var(--txt-dim); padding: 12px 20px; border-radius: 9px; font-family: inherit; font-weight: 600; cursor: pointer; }
+  .btn-danger { background: rgba(239,95,107,.13); color: var(--danger); border: none; padding: 7px 13px; border-radius: 7px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .btn-danger:hover { background: rgba(239,95,107,.22); }
+
+  /* Integrações */
+  .integ-card { background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; margin-bottom: 14px; }
+  .integ-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .integ-head .nome { font-size: 16px; font-weight: 700; }
+  .integ-fields { display: grid; grid-template-columns: 1.4fr 1fr; gap: 13px; margin-bottom: 14px; }
+  .integ-foot { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .conn-status { font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 7px; }
+  .conn-status .led2 { width: 8px; height: 8px; border-radius: 50%; }
+  .conn-status.ok { color: var(--accent); }
+  .conn-status.ok .led2 { background: var(--accent); }
+  .conn-status.erro { color: var(--danger); }
+  .conn-status.erro .led2 { background: var(--danger); }
+  .conn-status.none { color: var(--txt-dim); }
+  .conn-status.none .led2 { background: var(--txt-dim); }
+  .btn-sm { background: var(--accent); color: #fff; border: none; padding: 9px 16px; border-radius: 8px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .btn-sm:hover { background: var(--accent-2); }
+  .btn-sm.ghost { background: none; border: 1px solid var(--line); color: var(--txt); }
+  .integ-toggle-label { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--txt-dim); margin-left: auto; }
+
+  /* Frete grátis e select */
+  .fg-form { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px; align-items: end; }
+  .fg-form .btn { grid-column: 1 / -1; justify-self: start; }
+  .mini-select { width: 100%; background: var(--panel-2); border: 1px solid var(--line); color: var(--txt); padding: 12px 14px; border-radius: 9px; font-family: inherit; font-size: 14px; }
+  .mini-select:focus { outline: none; border-color: var(--accent); }
+  .btn-upload { background: var(--accent-soft); color: var(--accent); border: none; padding: 7px 13px; border-radius: 7px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .btn-upload:hover { background: #ecdbde; }
+</style>
+</head>
+<body>
+<aside>
+  <div class="logo">
+    <div class="logo-mark">L</div>
+    <div>
+      <h1>Logística</h1>
+      <span>Painel</span>
+    </div>
+  </div>
+  <nav>
+    <button class="active" data-view="dashboard"><span class="dot"></span> Dashboard</button>
+    <button data-view="transportadoras"><span class="dot"></span> Transportadoras</button>
+    <button data-view="simulador"><span class="dot"></span> Simulador</button>
+    <button data-view="integracoes"><span class="dot"></span> Integrações</button>
+    <button data-view="fretegratis"><span class="dot"></span> Frete Grátis</button>
+  </nav>
+</aside>
+
+<main>
+  <div class="head">
+    <div>
+      <h2 id="view-title">Dashboard</h2>
+      <p id="view-sub">Visão geral da operação</p>
+    </div>
+    <div class="status-api" id="apiStatus">
+      <span class="led"></span> <span id="apiText">conectando à API...</span>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <section class="view active" id="dashboard">
+    <div class="cards" id="resumoCards">
+      <div class="loading">Carregando dados reais...</div>
+    </div>
+    <div class="grid-2">
+      <div class="panel-box">
+        <h3>Frete médio por transportadora <span class="tag">dados reais</span></h3>
+        <canvas id="chartTransp"></canvas>
+      </div>
+      <div class="panel-box">
+        <h3>Cobertura por estado <span class="tag">dados reais</span></h3>
+        <canvas id="chartEstado"></canvas>
+      </div>
+    </div>
+    <div class="cards">
+      <div class="card pending">
+        <div class="label">Faturamento / transportadora</div>
+        <div class="value">Aguardando pedidos</div>
+        <span class="badge-soon">via Nuvemshop</span>
+      </div>
+      <div class="card pending">
+        <div class="label">Lead time real</div>
+        <div class="value">Aguardando pedidos</div>
+        <span class="badge-soon">via Nuvemshop</span>
+      </div>
+      <div class="card pending">
+        <div class="label">Pedidos no período</div>
+        <div class="value">Aguardando pedidos</div>
+        <span class="badge-soon">via Nuvemshop</span>
+      </div>
+      <div class="card pending">
+        <div class="label">SLA de entrega</div>
+        <div class="value">Aguardando pedidos</div>
+        <span class="badge-soon">via Nuvemshop</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRANSPORTADORAS -->
+  <section class="view" id="transportadoras">
+    <div class="panel-box">
+      <h3 style="justify-content:space-between">
+        <span>Gestão de transportadoras</span>
+        <button class="btn" onclick="abrirCadastro()">+ Nova transportadora</button>
+      </h3>
+      <div id="transpTable"><div class="loading">Carregando...</div></div>
+    </div>
+
+    <!-- Painel de edição por estado (aparece ao clicar numa transportadora) -->
+    <div class="panel-box" id="estadoPanel" style="display:none">
+      <h3 style="justify-content:space-between">
+        <span>Regras por estado — <span id="estadoTranspNome" style="color:var(--accent)"></span></span>
+        <button class="toggle-link" onclick="fecharEstados()">✕ fechar</button>
+      </h3>
+      <p style="color:var(--txt-dim);font-size:12px;margin-bottom:16px">
+        Defina markup, lead time extra e frete mínimo por estado. Desative um estado para
+        remover esta transportadora das cotações de lá. As mudanças salvam ao sair do campo.
+      </p>
+      <div id="estadoTable"><div class="loading">Carregando estados...</div></div>
+    </div>
+  </section>
+
+  <!-- INTEGRAÇÕES -->
+  <section class="view" id="integracoes">
+    <div class="panel-box">
+      <h3>Integração com as transportadoras</h3>
+      <p style="color:var(--txt-dim);font-size:12px;margin-bottom:18px">
+        Configure a URL da API e o token de cada transportadora. Use "Testar conexão"
+        para verificar se as credenciais respondem antes de ativar a integração.
+      </p>
+      <div id="integraList"><div class="loading">Carregando...</div></div>
+    </div>
+  </section>
+
+  <!-- FRETE GRÁTIS -->
+  <section class="view" id="fretegratis">
+    <div class="panel-box">
+      <h3>Nova regra de frete grátis</h3>
+      <p style="color:var(--txt-dim);font-size:12px;margin-bottom:16px">
+        O frete fica grátis quando o pedido casa com <strong>todas</strong> as condições:
+        transportadora, faixa de CEP, valor mínimo e período.
+      </p>
+      <div class="fg-form">
+        <label class="field"><span>Transportadora</span>
+          <select id="fgTransp" class="mini-select"><option value="">Todas</option></select>
+        </label>
+        <label class="field"><span>CEP início</span><input id="fgCepIni" class="mono" placeholder="00000000" /></label>
+        <label class="field"><span>CEP fim</span><input id="fgCepFim" class="mono" placeholder="99999999" /></label>
+        <label class="field"><span>Valor mínimo (R$)</span><input id="fgValor" class="mono" type="number" value="200" /></label>
+        <label class="field"><span>Início (opcional)</span><input id="fgInicio" type="date" /></label>
+        <label class="field"><span>Fim (opcional)</span><input id="fgFim" type="date" /></label>
+        <button class="btn" onclick="criarFreteGratis()">Adicionar regra</button>
+      </div>
+    </div>
+    <div class="panel-box">
+      <h3>Regras de frete grátis ativas</h3>
+      <div id="fgTable"><div class="loading">Carregando...</div></div>
+    </div>
+  </section>
+
+  <section class="view" id="simulador">
+    <div class="panel-box">
+      <h3>Simulador de frete <span class="tag">conectado</span></h3>
+      <div class="sim-form">
+        <label class="field"><span>CEP destino</span><input id="simCep" class="mono" value="29010000" placeholder="00000000" /></label>
+        <label class="field"><span>Peso (kg)</span><input id="simPeso" class="mono" type="number" value="3" /></label>
+        <label class="field"><span>Valor da NF (R$)</span><input id="simNf" class="mono" type="number" value="500" /></label>
+        <button class="btn" onclick="simular()">Cotar frete</button>
+      </div>
+      <div id="simOut"></div>
+    </div>
+  </section>
+</main>
+
+<!-- Modal cadastro -->
+<div class="modal-bg" id="modalCad">
+  <div class="modal">
+    <h3>Nova transportadora</h3>
+    <label class="field"><span>Nome da transportadora</span>
+      <input id="cadNome" placeholder="Ex: Jadlog" style="width:100%" />
+    </label>
+    <p style="color:var(--txt-dim);font-size:12px;margin-top:12px">
+      Ela será criada vazia. Depois importe a tabela de frete via
+      <span class="mono">/importador/Nome</span>.
+    </p>
+    <div class="actions">
+      <button class="btn-ghost" onclick="fecharCadastro()">Cancelar</button>
+      <button class="btn" onclick="salvarCadastro()">Criar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API = 'http://localhost:3000';
+  const BRL = v => 'R$ ' + Number(v).toFixed(2).replace('.', ',');
+  let chartTransp, chartEstado;
+
+  // Navegação
+  document.querySelectorAll('nav button').forEach(b => {
+    b.onclick = () => {
+      document.querySelectorAll('nav button').forEach(x => x.classList.remove('active'));
+      document.querySelectorAll('.view').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      const v = b.dataset.view;
+      document.getElementById(v).classList.add('active');
+      const titles = {
+        dashboard: ['Dashboard', 'Visão geral da operação'],
+        transportadoras: ['Transportadoras', 'Ative, desative e edite suas parceiras'],
+        simulador: ['Simulador', 'Teste cotações em tempo real'],
+        integracoes: ['Integrações', 'Conecte as APIs das transportadoras'],
+        fretegratis: ['Frete Grátis', 'Regras por valor, CEP e período']
+      };
+      document.getElementById('view-title').textContent = titles[v][0];
+      document.getElementById('view-sub').textContent = titles[v][1];
+      if (v === 'integracoes') loadIntegracoes();
+      if (v === 'transportadoras') loadTransp();
+      if (v === 'fretegratis') loadFreteGratis();
+    };
+  });
+
+  async function api(path, opts) {
+    const r = await fetch(API + path, opts);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }
+
+  async function checkApi() {
+    try {
+      await api('/');
+      document.getElementById('apiStatus').classList.add('on');
+      document.getElementById('apiText').textContent = 'API conectada';
+      return true;
+    } catch {
+      document.getElementById('apiStatus').classList.remove('on');
+      document.getElementById('apiText').textContent = 'API offline — rode npm run start:dev';
+      return false;
+    }
+  }
+
+  async function loadResumo() {
+    try {
+      const d = await api('/stats/resumo');
+      document.getElementById('resumoCards').innerHTML = `
+        <div class="card"><div class="label">Transportadoras ativas</div><div class="value">${d.transportadoras.ativas}</div><div class="sub">${d.transportadoras.total} no total · ${d.transportadoras.inativas} inativas</div></div>
+        <div class="card"><div class="label">Faixas de frete</div><div class="value">${d.faixas_frete.toLocaleString('pt-BR')}</div><div class="sub">linhas importadas no banco</div></div>
+        <div class="card"><div class="label">Prazo médio</div><div class="value">${d.prazo_medio_dias}<span style="font-size:15px;color:var(--txt-dim)"> dias</span></div><div class="sub">média das tabelas</div></div>
+        <div class="card"><div class="label">Frete médio base</div><div class="value" style="font-size:24px">${BRL(d.frete_medio_base)}</div><div class="sub">média das tabelas</div></div>`;
+    } catch (e) {
+      document.getElementById('resumoCards').innerHTML = '<div class="err">Não foi possível carregar o resumo. A API está rodando?</div>';
+    }
+  }
+
+  async function loadCharts() {
+    try {
+      const t = await api('/stats/por-transportadora');
+      if (chartTransp) chartTransp.destroy();
+      chartTransp = new Chart(document.getElementById('chartTransp'), {
+        type: 'bar',
+        data: { labels: t.map(x => x.transportadora), datasets: [{ label: 'Frete médio (R$)', data: t.map(x => x.frete_medio), backgroundColor: '#4b1018', borderRadius: 6 }] },
+        options: chartOpts()
+      });
+      const e = await api('/stats/por-estado');
+      const top = e.slice(0, 10);
+      if (chartEstado) chartEstado.destroy();
+      chartEstado = new Chart(document.getElementById('chartEstado'), {
+        type: 'bar',
+        data: { labels: top.map(x => x.estado), datasets: [{ label: 'Faixas de CEP', data: top.map(x => x.faixas), backgroundColor: '#b08d57', borderRadius: 6 }] },
+        options: chartOpts()
+      });
+    } catch (e) { /* silencioso */ }
+  }
+
+  function chartOpts() {
+    return {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#9a8589', font: { family: 'Sora' } } } },
+      scales: {
+        x: { ticks: { color: '#9a8589' }, grid: { color: '#ece2e0' } },
+        y: { ticks: { color: '#9a8589' }, grid: { color: '#ece2e0' } }
+      }
+    };
+  }
+
+  async function loadTransp() {
+    try {
+      const list = await api('/transportadoras');
+      if (!list.length) {
+        document.getElementById('transpTable').innerHTML = '<div class="empty">Nenhuma transportadora ainda. Clique em "+ Nova transportadora" ou importe uma tabela de frete.</div>';
+        return;
+      }
+      let html = '<input type="file" id="uploadFile" accept=".xlsx" style="display:none" /><table><thead><tr><th>Transportadora</th><th>Faixas de frete</th><th>Status global</th><th>Liga/Desliga</th><th>Regras por estado</th><th>Planilha</th><th></th></tr></thead><tbody>';
+      for (const t of list) {
+        html += `<tr>
+          <td><strong>${t.nome}</strong></td>
+          <td class="mono">${t.faixas_frete.toLocaleString('pt-BR')}</td>
+          <td><span class="pill ${t.ativo ? 'on' : 'off'}">${t.ativo ? '● Ativa' : '○ Inativa'}</span></td>
+          <td><button class="toggle ${t.ativo ? 'on' : ''}" onclick="toggleTransp(${t.id}, ${!t.ativo})"></button></td>
+          <td><button class="row-link" onclick="abrirEstados(${t.id}, '${t.nome}')">editar estados →</button></td>
+          <td><button class="btn-upload" onclick="importarPlanilha('${t.nome}')">↑ nova planilha</button></td>
+          <td><button class="btn-danger" onclick="excluirTransp(${t.id}, '${t.nome}')">excluir</button></td>
+        </tr>`;
+      }
+      html += '</tbody></table>';
+      document.getElementById('transpTable').innerHTML = html;
+    } catch (e) {
+      document.getElementById('transpTable').innerHTML = '<div class="err">Erro ao carregar transportadoras.</div>';
+    }
+  }
+
+  async function toggleTransp(id, ativo) {
+    try {
+      await api('/transportadoras/' + id + '/ativo', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ativo })
+      });
+      loadTransp();
+      loadResumo();
+    } catch (e) { alert('Erro ao alterar status.'); }
+  }
+
+  // ---- Cadastro de transportadora ----
+  function abrirCadastro() { document.getElementById('modalCad').classList.add('show'); document.getElementById('cadNome').value = ''; document.getElementById('cadNome').focus(); }
+  function fecharCadastro() { document.getElementById('modalCad').classList.remove('show'); }
+  async function salvarCadastro() {
+    const nome = document.getElementById('cadNome').value.trim();
+    if (!nome) { alert('Digite o nome.'); return; }
+    try {
+      await api('/transportadoras', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nome })
+      });
+      fecharCadastro();
+      loadTransp();
+      loadResumo();
+    } catch (e) { alert('Erro ao criar transportadora.'); }
+  }
+
+  // ---- Exclusão ----
+  async function excluirTransp(id, nome) {
+    if (!confirm('Excluir "' + nome + '"? Isso apaga também as tabelas de frete e regras dela. Esta ação não pode ser desfeita.')) return;
+    try {
+      await api('/transportadoras/' + id, { method: 'DELETE' });
+      fecharEstados();
+      loadTransp();
+      loadResumo();
+    } catch (e) { alert('Erro ao excluir.'); }
+  }
+
+  // ---- Edição por estado ----
+  let estadoTranspId = null;
+  async function abrirEstados(id, nome) {
+    estadoTranspId = id;
+    document.getElementById('estadoPanel').style.display = 'block';
+    document.getElementById('estadoTranspNome').textContent = nome;
+    document.getElementById('estadoTable').innerHTML = '<div class="loading">Carregando estados...</div>';
+    document.getElementById('estadoPanel').scrollIntoView({ behavior: 'smooth' });
+    try {
+      const regras = await api('/transportadoras/' + id + '/regras');
+      let html = '<div class="estado-grid"><table><thead><tr><th>UF</th><th>Markup (%)</th><th>Lead time extra (dias)</th><th>Frete mínimo (R$)</th><th>Ativa no estado</th><th></th></tr></thead><tbody>';
+      for (const r of regras) {
+        html += `<tr data-uf="${r.estado}">
+          <td><strong>${r.estado}</strong></td>
+          <td><input class="mini-input" type="number" step="0.01" value="${r.markup}" data-f="markup" /></td>
+          <td><input class="mini-input" type="number" value="${r.dias_extras}" data-f="dias_extras" /></td>
+          <td><input class="mini-input" type="number" step="0.01" value="${r.frete_minimo}" data-f="frete_minimo" /></td>
+          <td><button class="toggle sm ${r.ativo_no_estado ? 'on' : ''}" data-f="ativo"></button></td>
+          <td><span class="saved-flash">✓ salvo</span></td>
+        </tr>`;
+      }
+      html += '</tbody></table></div>';
+      document.getElementById('estadoTable').innerHTML = html;
+      // Liga os eventos de salvar
+      document.querySelectorAll('#estadoTable tr[data-uf]').forEach(tr => {
+        tr.querySelectorAll('input').forEach(inp => {
+          inp.addEventListener('blur', () => salvarEstado(tr));
+        });
+        const tog = tr.querySelector('.toggle');
+        tog.addEventListener('click', () => {
+          tog.classList.toggle('on');
+          salvarEstado(tr);
+        });
+      });
+    } catch (e) {
+      document.getElementById('estadoTable').innerHTML = '<div class="err">Erro ao carregar estados.</div>';
+    }
+  }
+
+  function fecharEstados() {
+    document.getElementById('estadoPanel').style.display = 'none';
+    estadoTranspId = null;
+  }
+
+  async function salvarEstado(tr) {
+    const uf = tr.dataset.uf;
+    const body = {
+      markup: Number(tr.querySelector('[data-f="markup"]').value) || 0,
+      dias_extras: Number(tr.querySelector('[data-f="dias_extras"]').value) || 0,
+      frete_minimo: Number(tr.querySelector('[data-f="frete_minimo"]').value) || 0,
+      ativo_no_estado: tr.querySelector('.toggle').classList.contains('on')
+    };
+    try {
+      await api('/transportadoras/' + estadoTranspId + '/regras/' + uf, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const flash = tr.querySelector('.saved-flash');
+      flash.classList.add('show');
+      setTimeout(() => flash.classList.remove('show'), 1200);
+    } catch (e) { alert('Erro ao salvar regra do estado ' + uf); }
+  }
+
+  // ---- Integrações ----
+  async function loadIntegracoes() {
+    try {
+      const list = await api('/transportadoras');
+      if (!list.length) {
+        document.getElementById('integraList').innerHTML = '<div class="empty">Nenhuma transportadora cadastrada ainda.</div>';
+        return;
+      }
+      let html = '';
+      for (const t of list) {
+        const st = t.status_conexao;
+        const stClass = st === 'ok' ? 'ok' : (st === 'erro' ? 'erro' : 'none');
+        const stText = st === 'ok' ? 'Conexão OK' : (st === 'erro' ? 'Falha na conexão' : 'Nunca testado');
+        html += `<div class="integ-card" data-id="${t.id}">
+          <div class="integ-head">
+            <span class="nome">${t.nome}</span>
+            <span class="conn-status ${stClass}"><span class="led2"></span>${stText}</span>
+          </div>
+          <div class="integ-fields">
+            <label class="field"><span>URL da API</span><input class="mono" data-f="api_url" value="${t.api_url || ''}" placeholder="https://api.transportadora.com" /></label>
+            <label class="field"><span>Token / chave</span><input class="mono" data-f="token" value="${t.token || ''}" placeholder="cole o token aqui" /></label>
+          </div>
+          <div class="integ-foot">
+            <button class="btn-sm" onclick="salvarIntegracao(${t.id})">Salvar</button>
+            <button class="btn-sm ghost" onclick="testarConexao(${t.id})">Testar conexão</button>
+            <span class="msg-teste" style="font-size:12px;color:var(--txt-dim)"></span>
+            <label class="integ-toggle-label">
+              Integração ativa
+              <button class="toggle sm ${t.integracao_ativa ? 'on' : ''}" data-f="integracao_ativa"></button>
+            </label>
+          </div>
+        </div>`;
+      }
+      document.getElementById('integraList').innerHTML = html;
+      document.querySelectorAll('#integraList .toggle').forEach(tog => {
+        tog.addEventListener('click', () => tog.classList.toggle('on'));
+      });
+    } catch (e) {
+      document.getElementById('integraList').innerHTML = '<div class="err">Erro ao carregar integrações.</div>';
+    }
+  }
+
+  function dadosCard(id) {
+    const card = document.querySelector('.integ-card[data-id="' + id + '"]');
+    return {
+      api_url: card.querySelector('[data-f="api_url"]').value.trim(),
+      token: card.querySelector('[data-f="token"]').value.trim(),
+      integracao_ativa: card.querySelector('[data-f="integracao_ativa"]').classList.contains('on'),
+      card
+    };
+  }
+
+  async function salvarIntegracao(id) {
+    const d = dadosCard(id);
+    try {
+      await api('/transportadoras/' + id + '/integracao', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_url: d.api_url, token: d.token, integracao_ativa: d.integracao_ativa })
+      });
+      const msg = d.card.querySelector('.msg-teste');
+      msg.textContent = '✓ salvo'; msg.style.color = 'var(--accent)';
+      setTimeout(() => msg.textContent = '', 1500);
+    } catch (e) { alert('Erro ao salvar integração.'); }
+  }
+
+  async function testarConexao(id) {
+    const d = dadosCard(id);
+    const msg = d.card.querySelector('.msg-teste');
+    msg.textContent = 'testando...'; msg.style.color = 'var(--txt-dim)';
+    try {
+      await api('/transportadoras/' + id + '/integracao', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_url: d.api_url, token: d.token })
+      });
+      const r = await api('/transportadoras/' + id + '/testar-conexao', { method: 'POST' });
+      msg.textContent = r.mensagem;
+      msg.style.color = r.ok ? 'var(--accent)' : 'var(--danger)';
+      loadIntegracoes();
+    } catch (e) {
+      msg.textContent = 'Erro ao testar.'; msg.style.color = 'var(--danger)';
+    }
+  }
+
+  // ---- Importar planilha nova (substitui a tabela da transportadora) ----
+  function importarPlanilha(nome) {
+    const inp = document.getElementById('uploadFile');
+    inp.value = '';
+    inp.onchange = async () => {
+      const file = inp.files[0];
+      if (!file) return;
+      if (!confirm('Importar "' + file.name + '" para ' + nome + '?\nIsso SUBSTITUI toda a tabela de frete atual dessa transportadora.')) return;
+      const fd = new FormData();
+      fd.append('arquivo', file);
+      try {
+        const r = await fetch(API + '/importador/' + encodeURIComponent(nome), { method: 'POST', body: fd });
+        const d = await r.json();
+        if (d.linhas_importadas !== undefined) {
+          alert('✓ ' + d.linhas_importadas.toLocaleString('pt-BR') + ' linhas importadas para ' + nome + '.');
+          loadTransp(); loadResumo();
+        } else {
+          alert('Erro: ' + (d.message || 'falha ao importar.'));
+        }
+      } catch (e) { alert('Erro ao enviar a planilha.'); }
+    };
+    inp.click();
+  }
+
+  // ---- Frete grátis ----
+  async function loadFreteGratis() {
+    // preenche o select de transportadoras
+    try {
+      const transp = await api('/transportadoras');
+      const sel = document.getElementById('fgTransp');
+      sel.innerHTML = '<option value="">Todas</option>' + transp.map(t => `<option value="${t.id}">${t.nome}</option>`).join('');
+    } catch (e) {}
+    // lista as regras
+    try {
+      const list = await api('/frete-gratis');
+      if (!list.length) {
+        document.getElementById('fgTable').innerHTML = '<div class="empty">Nenhuma regra de frete grátis cadastrada.</div>';
+        return;
+      }
+      let html = '<table><thead><tr><th>Transportadora</th><th>Faixa de CEP</th><th>Valor mínimo</th><th>Período</th><th></th></tr></thead><tbody>';
+      for (const r of list) {
+        const cep = String(r.cep_inicio).padStart(8,'0') + ' – ' + String(r.cep_fim).padStart(8,'0');
+        const periodo = (r.data_inicio || '∞') + ' até ' + (r.data_fim || '∞');
+        html += `<tr>
+          <td>${r.transportadora_id ? ('#' + r.transportadora_id) : 'Todas'}</td>
+          <td class="mono">${cep}</td>
+          <td>R$ ${Number(r.valor_minimo).toFixed(2).replace('.', ',')}</td>
+          <td style="font-size:12px">${periodo}</td>
+          <td><button class="btn-danger" onclick="removerFreteGratis(${r.id})">remover</button></td>
+        </tr>`;
+      }
+      html += '</tbody></table>';
+      document.getElementById('fgTable').innerHTML = html;
+    } catch (e) {
+      document.getElementById('fgTable').innerHTML = '<div class="err">Erro ao carregar regras.</div>';
+    }
+  }
+
+  async function criarFreteGratis() {
+    const cepIni = document.getElementById('fgCepIni').value.replace(/\D/g,'');
+    const cepFim = document.getElementById('fgCepFim').value.replace(/\D/g,'');
+    if (!cepIni || !cepFim) { alert('Preencha a faixa de CEP.'); return; }
+    const body = {
+      transportadora_id: document.getElementById('fgTransp').value ? Number(document.getElementById('fgTransp').value) : null,
+      cep_inicio: Number(cepIni),
+      cep_fim: Number(cepFim),
+      valor_minimo: Number(document.getElementById('fgValor').value) || 0,
+      data_inicio: document.getElementById('fgInicio').value || null,
+      data_fim: document.getElementById('fgFim').value || null
+    };
+    try {
+      await api('/frete-gratis', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      loadFreteGratis();
+    } catch (e) { alert('Erro ao criar regra.'); }
+  }
+
+  async function removerFreteGratis(id) {
+    if (!confirm('Remover esta regra de frete grátis?')) return;
+    try { await api('/frete-gratis/' + id, { method: 'DELETE' }); loadFreteGratis(); }
+    catch (e) { alert('Erro ao remover.'); }
+  }
+
+  async function simular() {
+    const out = document.getElementById('simOut');
+    out.innerHTML = '<div class="loading">Cotando...</div>';
+    try {
+      const d = await api('/api/cotacao', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cep_destino: document.getElementById('simCep').value,
+          peso: Number(document.getElementById('simPeso').value),
+          valor_nf: Number(document.getElementById('simNf').value)
+        })
+      });
+      if (!d.opcoes || !d.opcoes.length) {
+        out.innerHTML = '<div class="empty">Nenhuma transportadora atende esse CEP/peso.</div>';
+        return;
+      }
+      const cheapName = d.mais_barato ? d.mais_barato.transportadora : null;
+      const fastName = d.mais_rapido ? d.mais_rapido.transportadora : null;
+      let html = `<div style="margin-top:18px;font-size:12px;color:var(--txt-dim)">Destino: <strong style="color:var(--txt)">${d.estado || '—'}</strong> · ${d.opcoes.length} opções</div><div class="sim-results">`;
+      for (const o of d.opcoes) {
+        const isCheap = o.transportadora === cheapName;
+        const isFast = o.transportadora === fastName;
+        html += `<div class="sim-row ${isCheap ? 'best' : ''}">
+          <div>
+            <div class="tname">${o.transportadora}
+              ${isCheap ? '<span class="flag cheap">+ barato</span>' : ''}
+              ${isFast ? '<span class="flag fast">+ rápido</span>' : ''}
+            </div>
+            <div class="tmeta">Prazo estimado: ${o.prazo} dia(s)</div>
+          </div>
+          <div class="tprice">${o.frete_gratis ? '<span style="color:var(--accent)">GRÁTIS</span>' : BRL(o.valor)}</div>
+        </div>`;
+      }
+      html += '</div>';
+      out.innerHTML = html;
+    } catch (e) {
+      out.innerHTML = '<div class="err">Erro ao cotar. Verifique se a API está rodando e se as tabelas foram importadas.</div>';
+    }
+  }
+
+  // Inicialização
+  (async () => {
+    const ok = await checkApi();
+    if (ok) {
+      loadResumo();
+      loadCharts();
+      loadTransp();
+    }
+  })();
+  setInterval(checkApi, 8000);
+</script>
+</body>
+</html>
