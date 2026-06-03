@@ -1,11 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { Transportadora } from './database/entities/transportadora.entity';
 import { TabelaFrete } from './database/entities/tabela-frete.entity';
 import { RegraComercial } from './database/entities/regra-comercial.entity';
 import { FreteGratis } from './database/entities/frete-gratis.entity';
 import { Usuario } from './database/entities/usuario.entity';
+import { LojaNuvemshop } from './database/entities/loja-nuvemshop.entity';
 import { AppController } from './app.controller';
 import { ImportadorModule } from './importador/importador.module';
 import { CotacaoModule } from './cotacao/cotacao.module';
@@ -17,12 +20,18 @@ import { AuthModule } from './auth/auth.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    // Rate limiting (item 4): no maximo 60 requisicoes por minuto por IP.
+    // Protege contra forca bruta no login e abuso geral.
+    ThrottlerModule.forRoot([
+      { ttl: 60000, limit: 60 },
+    ]),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        // Se houver DATABASE_URL (Railway injeta automaticamente), usa ela.
-        // Senao, usa as variaveis separadas (desenvolvimento local).
         const url = config.get('DATABASE_URL');
+        // synchronize (item 5): por padrao DESLIGADO (seguro em producao).
+        // Ligue so em desenvolvimento com DB_SYNC=true.
+        const sync = config.get('DB_SYNC') === 'true';
         const base: any = {
           type: 'postgres',
           entities: [
@@ -31,14 +40,14 @@ import { AuthModule } from './auth/auth.module';
             RegraComercial,
             FreteGratis,
             Usuario,
+            LojaNuvemshop,
           ],
-          synchronize: true,
+          synchronize: sync,
         };
         if (url) {
           return {
             ...base,
             url,
-            // Railway exige SSL nas conexoes externas
             ssl: { rejectUnauthorized: false },
           };
         }
@@ -60,5 +69,9 @@ import { AuthModule } from './auth/auth.module';
     AuthModule,
   ],
   controllers: [AppController],
+  providers: [
+    // Aplica o rate limiting globalmente
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule {}

@@ -17,12 +17,17 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  // Segredos e duracoes (vem do .env, com padrao para desenvolvimento)
+  // Segredos vem OBRIGATORIAMENTE das variaveis de ambiente.
+  // Sem fallback inseguro: se faltar, o sistema falha de proposito.
   private get accessSecret() {
-    return process.env.JWT_ACCESS_SECRET || 'troque-este-segredo-access';
+    const s = process.env.JWT_ACCESS_SECRET;
+    if (!s) throw new Error('JWT_ACCESS_SECRET nao configurado.');
+    return s;
   }
   private get refreshSecret() {
-    return process.env.JWT_REFRESH_SECRET || 'troque-este-segredo-refresh';
+    const s = process.env.JWT_REFRESH_SECRET;
+    if (!s) throw new Error('JWT_REFRESH_SECRET nao configurado.');
+    return s;
   }
 
   // Cria o primeiro usuario (ou mais). Em producao, proteja/remova esta rota.

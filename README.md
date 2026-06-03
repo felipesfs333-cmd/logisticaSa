@@ -268,6 +268,3 @@ credenciais e a URL HTTPS, o último passo é só o registro do carrier.
 O próximo módulo do documento é a **Integração Nuvemshop**: fazer a loja
 consumir o `/api/cotacao` no checkout e receber os pedidos via webhook.
 
-#   l o g i s t i c a S a  
- "# logisticaSa"  
-"# logisticaSa"  

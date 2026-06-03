@@ -1,19 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor() {
+  constructor(configService: ConfigService) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey:
-        process.env.JWT_ACCESS_SECRET || 'troque-este-segredo-access',
+      secretOrKey: configService.get<string>('JWT_ACCESS_SECRET'),
     });
   }
 
-  // O que retorna aqui vira o req.user nas rotas protegidas
   async validate(payload: any) {
     return { id: payload.sub, email: payload.email, papel: payload.papel };
   }

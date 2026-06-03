@@ -199,6 +199,53 @@
 </style>
 </head>
 <body>
+<!-- Tela de login (cobre tudo com fundo escuro ate o usuario logar) -->
+<div id="loginOverlay" style="display:flex; position:fixed; inset:0; z-index:9999; align-items:center; justify-content:center; background:linear-gradient(135deg,#2a0a0e 0%,#4B1018 55%,#1a0608 100%); overflow:hidden;">
+  <!-- textura decorativa de fundo -->
+  <div style="position:absolute; inset:0; opacity:.07; background-image:radial-gradient(circle at 20% 30%, #B08D57 0, transparent 35%), radial-gradient(circle at 80% 70%, #B08D57 0, transparent 35%); pointer-events:none;"></div>
+
+  <div style="position:relative; background:#fff; border-radius:20px; padding:40px 36px; width:380px; max-width:92vw; box-shadow:0 30px 80px rgba(0,0,0,0.55); animation:loginEntra .4s ease;">
+    <!-- marca -->
+    <div style="display:flex; flex-direction:column; align-items:center; gap:14px; margin-bottom:26px;">
+      <div style="width:62px; height:62px; border-radius:16px; background:linear-gradient(135deg,#4B1018,#8A2436); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:30px; box-shadow:0 8px 24px rgba(75,16,24,.35);">L</div>
+      <div style="text-align:center;">
+        <div style="font-size:20px; font-weight:700; color:#4B1018; letter-spacing:-.01em;">Painel Logística</div>
+        <div style="font-size:12px; color:#9a8; color:#B08D57; font-weight:600; letter-spacing:.08em; text-transform:uppercase; margin-top:3px;">Super Adega</div>
+      </div>
+    </div>
+
+    <p style="color:#777; font-size:13.5px; margin:0 0 22px; text-align:center;">Acesso restrito. Entre para continuar.</p>
+
+    <!-- email -->
+    <label style="display:block; font-size:12px; font-weight:600; color:#555; margin-bottom:6px;">E-mail</label>
+    <input id="loginEmail" type="email" placeholder="seu@email.com" autocomplete="username"
+      style="width:100%; padding:13px 14px; border:1.5px solid #e2e2e2; border-radius:11px; margin-bottom:16px; font-size:14px; box-sizing:border-box; transition:border-color .15s; outline:none;"
+      onfocus="this.style.borderColor='#8A2436'" onblur="this.style.borderColor='#e2e2e2'" />
+
+    <!-- senha com botao mostrar/ocultar -->
+    <label style="display:block; font-size:12px; font-weight:600; color:#555; margin-bottom:6px;">Senha</label>
+    <div style="position:relative; margin-bottom:22px;">
+      <input id="loginSenha" type="password" placeholder="••••••••" autocomplete="current-password"
+        style="width:100%; padding:13px 44px 13px 14px; border:1.5px solid #e2e2e2; border-radius:11px; font-size:14px; box-sizing:border-box; transition:border-color .15s; outline:none;"
+        onfocus="this.style.borderColor='#8A2436'" onblur="this.style.borderColor='#e2e2e2'" />
+      <button type="button" id="toggleSenha" title="Mostrar/ocultar senha"
+        style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:16px; padding:6px; color:#999; line-height:1;">👁</button>
+    </div>
+
+    <button id="loginBtn"
+      style="width:100%; padding:14px; background:linear-gradient(135deg,#4B1018,#8A2436); color:#fff; border:none; border-radius:11px; font-size:15px; font-weight:700; cursor:pointer; box-shadow:0 6px 18px rgba(75,16,24,.3); transition:transform .1s, box-shadow .15s;"
+      onmousedown="this.style.transform='scale(.985)'" onmouseup="this.style.transform='scale(1)'" onmouseleave="this.style.transform='scale(1)'">Entrar</button>
+
+    <div id="loginErro" style="color:#c0392b; font-size:13px; margin-top:14px; display:none; text-align:center; background:#fdecea; padding:10px; border-radius:9px;"></div>
+
+    <div style="margin-top:22px; padding-top:18px; border-top:1px solid #f0f0f0; text-align:center; font-size:11px; color:#bbb;">Sistema interno • acesso autorizado</div>
+  </div>
+</div>
+<style>
+  @keyframes loginEntra { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+  /* trava rolagem do fundo enquanto o login esta aberto */
+  body.login-aberto { overflow:hidden; }
+</style>
 <aside>
   <div class="logo">
     <div class="logo-mark">L</div>
@@ -363,7 +410,21 @@
 <script>
   const API = 'https://logisticasa-production.up.railway.app';
   const BRL = v => 'R$ ' + Number(v).toFixed(2).replace('.', ',');
+  // esc() neutraliza dados antes de jogar no HTML (protege contra XSS).
+  // Use SEMPRE que for inserir texto vindo do banco/API em template ${...}.
+  const esc = v => {
+    if (v === null || v === undefined) return '';
+    return String(v)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  };
   let chartTransp, chartEstado;
+
+  // Guarda o token de acesso (sobrevive a recarregar a pagina nesta aba)
+  let TOKEN = sessionStorage.getItem('token') || null;
 
   // Navegação
   document.querySelectorAll('nav button').forEach(b => {
@@ -389,7 +450,18 @@
   });
 
   async function api(path, opts) {
+    opts = opts || {};
+    opts.headers = opts.headers || {};
+    // Anexa o token de login em toda chamada, se existir
+    if (TOKEN) opts.headers['Authorization'] = 'Bearer ' + TOKEN;
     const r = await fetch(API + path, opts);
+    // Se o token expirou ou falta, pede login de novo
+    if (r.status === 401) {
+      TOKEN = null;
+      sessionStorage.removeItem('token');
+      mostrarLogin();
+      throw new Error('HTTP 401');
+    }
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return r.json();
   }
@@ -460,14 +532,16 @@
       }
       let html = '<input type="file" id="uploadFile" accept=".xlsx" style="display:none" /><table><thead><tr><th>Transportadora</th><th>Faixas de frete</th><th>Status global</th><th>Liga/Desliga</th><th>Regras por estado</th><th>Planilha</th><th></th></tr></thead><tbody>';
       for (const t of list) {
+        const nomeSafe = esc(t.nome);
+        const nomeAttr = esc(t.nome).replace(/'/g, "\\'"); // pra usar dentro de onclick='...'
         html += `<tr>
-          <td><strong>${t.nome}</strong></td>
+          <td><strong>${nomeSafe}</strong></td>
           <td class="mono">${t.faixas_frete.toLocaleString('pt-BR')}</td>
           <td><span class="pill ${t.ativo ? 'on' : 'off'}">${t.ativo ? '● Ativa' : '○ Inativa'}</span></td>
           <td><button class="toggle ${t.ativo ? 'on' : ''}" onclick="toggleTransp(${t.id}, ${!t.ativo})"></button></td>
-          <td><button class="row-link" onclick="abrirEstados(${t.id}, '${t.nome}')">editar estados →</button></td>
-          <td><button class="btn-upload" onclick="importarPlanilha('${t.nome}')">↑ nova planilha</button></td>
-          <td><button class="btn-danger" onclick="excluirTransp(${t.id}, '${t.nome}')">excluir</button></td>
+          <td><button class="row-link" onclick="abrirEstados(${t.id}, '${nomeAttr}')">editar estados →</button></td>
+          <td><button class="btn-upload" onclick="importarPlanilha('${nomeAttr}')">↑ nova planilha</button></td>
+          <td><button class="btn-danger" onclick="excluirTransp(${t.id}, '${nomeAttr}')">excluir</button></td>
         </tr>`;
       }
       html += '</tbody></table>';
@@ -595,14 +669,53 @@
         const st = t.status_conexao;
         const stClass = st === 'ok' ? 'ok' : (st === 'erro' ? 'erro' : 'none');
         const stText = st === 'ok' ? 'Conexão OK' : (st === 'erro' ? 'Falha na conexão' : 'Nunca testado');
+        const tipo = t.auth_tipo || 'token_fixo';
+        const fmt = t.auth_formato || 'form';
+        const env = t.token_envio || 'bearer';
         html += `<div class="integ-card" data-id="${t.id}">
           <div class="integ-head">
-            <span class="nome">${t.nome}</span>
+            <span class="nome">${esc(t.nome)}</span>
             <span class="conn-status ${stClass}"><span class="led2"></span>${stText}</span>
           </div>
           <div class="integ-fields">
-            <label class="field"><span>URL da API</span><input class="mono" data-f="api_url" value="${t.api_url || ''}" placeholder="https://api.transportadora.com" /></label>
-            <label class="field"><span>Token / chave</span><input class="mono" data-f="token" value="${t.token || ''}" placeholder="cole o token aqui" /></label>
+            <label class="field"><span>Tipo de autenticação</span>
+              <select data-f="auth_tipo" onchange="ajustarCampos(${t.id})" style="padding:9px;border:1px solid var(--linha,#ddd);border-radius:8px;">
+                <option value="token_fixo" ${tipo==='token_fixo'?'selected':''}>Token fixo (cole o token)</option>
+                <option value="login_senha" ${tipo==='login_senha'?'selected':''}>Login com usuário e senha (gera token)</option>
+                <option value="nenhuma" ${tipo==='nenhuma'?'selected':''}>Sem autenticação</option>
+              </select>
+            </label>
+            <label class="field"><span>URL da API (chamada de teste)</span><input class="mono" data-f="api_url" value="${esc(t.api_url || '')}" placeholder="https://api.transportadora.com/rastreio" /></label>
+
+            <!-- Campos do TOKEN FIXO -->
+            <div class="grp-token_fixo" style="display:${tipo==='token_fixo'?'block':'none'}">
+              <label class="field"><span>Token / chave</span><input class="mono" data-f="token" value="${esc(t.token || '')}" placeholder="cole o token aqui" /></label>
+            </div>
+
+            <!-- Campos do LOGIN E SENHA -->
+            <div class="grp-login_senha" style="display:${tipo==='login_senha'?'block':'none'}">
+              <label class="field"><span>URL de login (gera o token)</span><input class="mono" data-f="auth_url" value="${esc(t.auth_url || '')}" placeholder="https://api.rte.com.br/token" /></label>
+              <label class="field"><span>Usuário</span><input class="mono" data-f="auth_usuario" value="${esc(t.auth_usuario || '')}" placeholder="seu usuário" /></label>
+              <label class="field"><span>Senha</span><input class="mono" type="password" data-f="auth_senha" value="${esc(t.auth_senha || '')}" placeholder="sua senha" /></label>
+              <label class="field"><span>Campos extras (JSON)</span><input class="mono" data-f="auth_extra" value="${esc(t.auth_extra || '')}" placeholder='{"grant_type":"password","companyId":"1","auth_type":"dev"}' /></label>
+              <label class="field"><span>Formato do login</span>
+                <select data-f="auth_formato" style="padding:9px;border:1px solid var(--linha,#ddd);border-radius:8px;">
+                  <option value="form" ${fmt==='form'?'selected':''}>Formulário (x-www-form-urlencoded)</option>
+                  <option value="json" ${fmt==='json'?'selected':''}>JSON</option>
+                </select>
+              </label>
+            </div>
+
+            <!-- Como enviar o token (comum a token_fixo e login_senha) -->
+            <div class="grp-envio" style="display:${tipo==='nenhuma'?'none':'block'}">
+              <label class="field"><span>Como enviar o token</span>
+                <select data-f="token_envio" onchange="ajustarCampos(${t.id})" style="padding:9px;border:1px solid var(--linha,#ddd);border-radius:8px;">
+                  <option value="bearer" ${env==='bearer'?'selected':''}>Authorization: Bearer TOKEN</option>
+                  <option value="header" ${env==='header'?'selected':''}>Header customizado</option>
+                </select>
+              </label>
+              <label class="field grp-header" style="display:${env==='header'?'block':'none'}"><span>Nome do header</span><input class="mono" data-f="auth_header_nome" value="${esc(t.auth_header_nome || '')}" placeholder="x-api-key" /></label>
+            </div>
           </div>
           <div class="integ-foot">
             <button class="btn-sm" onclick="salvarIntegracao(${t.id})">Salvar</button>
@@ -612,6 +725,10 @@
               Integração ativa
               <button class="toggle sm ${t.integracao_ativa ? 'on' : ''}" data-f="integracao_ativa"></button>
             </label>
+          </div>
+          <div class="resposta-crua" style="display:none;margin-top:10px;">
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--txt-dim);margin-bottom:4px;">Resposta da API (crua)</div>
+            <pre class="mono" style="background:#1e1e1e;color:#ddd;padding:12px;border-radius:8px;overflow:auto;max-height:240px;font-size:12px;white-space:pre-wrap;word-break:break-all;"></pre>
           </div>
         </div>`;
       }
@@ -624,11 +741,31 @@
     }
   }
 
+  // Mostra/esconde os campos conforme o tipo de auth e o modo de envio do token
+  function ajustarCampos(id) {
+    const card = document.querySelector('.integ-card[data-id="' + id + '"]');
+    const tipo = card.querySelector('[data-f="auth_tipo"]').value;
+    card.querySelector('.grp-token_fixo').style.display = tipo === 'token_fixo' ? 'block' : 'none';
+    card.querySelector('.grp-login_senha').style.display = tipo === 'login_senha' ? 'block' : 'none';
+    card.querySelector('.grp-envio').style.display = tipo === 'nenhuma' ? 'none' : 'block';
+    const env = card.querySelector('[data-f="token_envio"]').value;
+    card.querySelector('.grp-header').style.display = env === 'header' ? 'block' : 'none';
+  }
+
   function dadosCard(id) {
     const card = document.querySelector('.integ-card[data-id="' + id + '"]');
+    const val = f => { const el = card.querySelector('[data-f="' + f + '"]'); return el ? el.value.trim() : undefined; };
     return {
-      api_url: card.querySelector('[data-f="api_url"]').value.trim(),
-      token: card.querySelector('[data-f="token"]').value.trim(),
+      api_url: val('api_url'),
+      token: val('token'),
+      auth_tipo: val('auth_tipo'),
+      auth_url: val('auth_url'),
+      auth_usuario: val('auth_usuario'),
+      auth_senha: val('auth_senha'),
+      auth_extra: val('auth_extra'),
+      auth_formato: val('auth_formato'),
+      token_envio: val('token_envio'),
+      auth_header_nome: val('auth_header_nome'),
       integracao_ativa: card.querySelector('[data-f="integracao_ativa"]').classList.contains('on'),
       card
     };
@@ -636,13 +773,14 @@
 
   async function salvarIntegracao(id) {
     const d = dadosCard(id);
+    const { card, ...body } = d;
     try {
       await api('/transportadoras/' + id + '/integracao', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ api_url: d.api_url, token: d.token, integracao_ativa: d.integracao_ativa })
+        body: JSON.stringify(body)
       });
-      const msg = d.card.querySelector('.msg-teste');
+      const msg = card.querySelector('.msg-teste');
       msg.textContent = '✓ salvo'; msg.style.color = 'var(--accent)';
       setTimeout(() => msg.textContent = '', 1500);
     } catch (e) { alert('Erro ao salvar integração.'); }
@@ -650,17 +788,31 @@
 
   async function testarConexao(id) {
     const d = dadosCard(id);
-    const msg = d.card.querySelector('.msg-teste');
+    const { card, ...body } = d;
+    const msg = card.querySelector('.msg-teste');
     msg.textContent = 'testando...'; msg.style.color = 'var(--txt-dim)';
     try {
+      // Salva os dados antes de testar (pra testar exatamente o que está na tela)
       await api('/transportadoras/' + id + '/integracao', {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ api_url: d.api_url, token: d.token })
+        body: JSON.stringify(body)
       });
       const r = await api('/transportadoras/' + id + '/testar-conexao', { method: 'POST' });
-      msg.textContent = r.mensagem;
+      msg.textContent = r.mensagem + (r.status_http ? ' (HTTP ' + r.status_http + ')' : '');
       msg.style.color = r.ok ? 'var(--accent)' : 'var(--danger)';
-      loadIntegracoes();
+      // Mostra a resposta crua, se veio
+      const box = card.querySelector('.resposta-crua');
+      const pre = box.querySelector('pre');
+      if (r.resposta_crua) {
+        pre.textContent = r.resposta_crua;
+        box.style.display = 'block';
+      } else {
+        box.style.display = 'none';
+      }
+      // atualiza só o status visual, sem recarregar tudo (pra não perder a resposta)
+      const cs = card.querySelector('.conn-status');
+      cs.className = 'conn-status ' + (r.ok ? 'ok' : 'erro');
+      cs.innerHTML = '<span class="led2"></span>' + (r.ok ? 'Conexão OK' : 'Falha na conexão');
     } catch (e) {
       msg.textContent = 'Erro ao testar.'; msg.style.color = 'var(--danger)';
     }
@@ -677,7 +829,11 @@
       const fd = new FormData();
       fd.append('arquivo', file);
       try {
-        const r = await fetch(API + '/importador/' + encodeURIComponent(nome), { method: 'POST', body: fd });
+        const r = await fetch(API + '/importador/' + encodeURIComponent(nome), {
+          method: 'POST',
+          headers: TOKEN ? { 'Authorization': 'Bearer ' + TOKEN } : {},
+          body: fd
+        });
         const d = await r.json();
         if (d.linhas_importadas !== undefined) {
           alert('✓ ' + d.linhas_importadas.toLocaleString('pt-BR') + ' linhas importadas para ' + nome + '.');
@@ -696,7 +852,7 @@
     try {
       const transp = await api('/transportadoras');
       const sel = document.getElementById('fgTransp');
-      sel.innerHTML = '<option value="">Todas</option>' + transp.map(t => `<option value="${t.id}">${t.nome}</option>`).join('');
+      sel.innerHTML = '<option value="">Todas</option>' + transp.map(t => `<option value="${t.id}">${esc(t.nome)}</option>`).join('');
     } catch (e) {}
     // lista as regras
     try {
@@ -773,7 +929,7 @@
         const isFast = o.transportadora === fastName;
         html += `<div class="sim-row ${isCheap ? 'best' : ''}">
           <div>
-            <div class="tname">${o.transportadora}
+            <div class="tname">${esc(o.transportadora)}
               ${isCheap ? '<span class="flag cheap">+ barato</span>' : ''}
               ${isFast ? '<span class="flag fast">+ rápido</span>' : ''}
             </div>
@@ -789,13 +945,88 @@
     }
   }
 
+  // ===== LOGIN =====
+  function mostrarLogin() {
+    document.getElementById('loginOverlay').style.display = 'flex';
+    document.body.classList.add('login-aberto');
+    // foca no campo de email automaticamente
+    setTimeout(() => { const el = document.getElementById('loginEmail'); if (el) el.focus(); }, 50);
+  }
+  function esconderLogin() {
+    document.getElementById('loginOverlay').style.display = 'none';
+    document.body.classList.remove('login-aberto');
+  }
+
+  // Botao mostrar/ocultar senha
+  document.getElementById('toggleSenha').addEventListener('click', () => {
+    const inp = document.getElementById('loginSenha');
+    const btn = document.getElementById('toggleSenha');
+    if (inp.type === 'password') { inp.type = 'text'; btn.style.color = '#4B1018'; }
+    else { inp.type = 'password'; btn.style.color = '#999'; }
+  });
+
+  async function fazerLogin() {
+    const email = document.getElementById('loginEmail').value.trim();
+    const senha = document.getElementById('loginSenha').value;
+    const erro = document.getElementById('loginErro');
+    const btn = document.getElementById('loginBtn');
+    erro.style.display = 'none';
+    btn.textContent = 'Entrando...';
+    btn.disabled = true;
+    try {
+      const r = await fetch(API + '/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, senha })
+      });
+      if (!r.ok) throw new Error('login');
+      const d = await r.json();
+      TOKEN = d.access_token;
+      sessionStorage.setItem('token', TOKEN);
+      esconderLogin();
+      iniciarPainel();
+    } catch {
+      erro.textContent = 'E-mail ou senha incorretos.';
+      erro.style.display = 'block';
+    } finally {
+      btn.textContent = 'Entrar';
+      btn.disabled = false;
+    }
+  }
+
+  document.getElementById('loginBtn').addEventListener('click', fazerLogin);
+  document.getElementById('loginSenha').addEventListener('keydown', e => {
+    if (e.key === 'Enter') fazerLogin();
+  });
+  document.getElementById('loginEmail').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('loginSenha').focus();
+  });
+
+  // Carrega os dados do painel (so chamado quando ha token)
+  function iniciarPainel() {
+    loadResumo();
+    loadCharts();
+    loadTransp();
+  }
+
   // Inicialização
+  // O login já começa visível (no HTML). Só escondemos se o token funcionar.
+  document.body.classList.add('login-aberto');
   (async () => {
     const ok = await checkApi();
-    if (ok) {
-      loadResumo();
-      loadCharts();
-      loadTransp();
+    if (!ok) return; // API offline: mantém login na frente
+    if (TOKEN) {
+      // Tenta usar o token guardado. Se for válido, esconde o login e entra.
+      // Se estiver expirado, a função api() detecta o 401 e reabre o login.
+      try {
+        await api('/stats/resumo'); // chamada leve só pra validar o token
+        esconderLogin();
+        iniciarPainel();
+      } catch {
+        mostrarLogin(); // token inválido/expirado
+      }
+    } else {
+      mostrarLogin();
     }
   })();
   setInterval(checkApi, 8000);

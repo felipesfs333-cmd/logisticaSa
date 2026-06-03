@@ -5,6 +5,7 @@ import { Transportadora } from '../database/entities/transportadora.entity';
 import { TabelaFrete } from '../database/entities/tabela-frete.entity';
 import { RegraComercial } from '../database/entities/regra-comercial.entity';
 import { CarrierAuthService } from './carrier-auth.service';
+import { CryptoService } from './crypto.service';
 
 @Injectable()
 export class TransportadorasService {
@@ -16,6 +17,7 @@ export class TransportadorasService {
     @InjectRepository(RegraComercial)
     private regraRepo: Repository<RegraComercial>,
     private carrierAuth: CarrierAuthService,
+    private cryptoSvc: CryptoService,
   ) {}
 
   // Lista as transportadoras, ja com a contagem de faixas de frete de cada uma
@@ -86,13 +88,15 @@ export class TransportadorasService {
     const t = await this.transpRepo.findOne({ where: { id } });
     if (!t) throw new NotFoundException('Transportadora nao encontrada.');
     if (dados.api_url !== undefined) t.api_url = dados.api_url;
-    if (dados.token !== undefined) t.token = dados.token;
+    // Campos sensiveis sao criptografados antes de salvar
+    if (dados.token !== undefined) t.token = this.cryptoSvc.encrypt(dados.token);
     if (dados.integracao_ativa !== undefined)
       t.integracao_ativa = dados.integracao_ativa;
     if (dados.auth_tipo !== undefined) t.auth_tipo = dados.auth_tipo;
     if (dados.auth_url !== undefined) t.auth_url = dados.auth_url;
     if (dados.auth_usuario !== undefined) t.auth_usuario = dados.auth_usuario;
-    if (dados.auth_senha !== undefined) t.auth_senha = dados.auth_senha;
+    if (dados.auth_senha !== undefined)
+      t.auth_senha = this.cryptoSvc.encrypt(dados.auth_senha);
     if (dados.auth_extra !== undefined) t.auth_extra = dados.auth_extra;
     if (dados.auth_formato !== undefined) t.auth_formato = dados.auth_formato;
     if (dados.token_envio !== undefined) t.token_envio = dados.token_envio;
@@ -112,8 +116,15 @@ export class TransportadorasService {
     const t = await this.transpRepo.findOne({ where: { id } });
     if (!t) throw new NotFoundException('Transportadora nao encontrada.');
 
+    // Descriptografa as credenciais numa copia, so pra usar agora
+    const tDecrypt = {
+      ...t,
+      token: this.cryptoSvc.decrypt(t.token),
+      auth_senha: this.cryptoSvc.decrypt(t.auth_senha),
+    } as Transportadora;
+
     // --- Passo 1: autenticar (gera/obtem o token conforme o tipo) ---
-    const auth = await this.carrierAuth.obterToken(t);
+    const auth = await this.carrierAuth.obterToken(tDecrypt);
     if (!auth.ok) {
       t.status_conexao = 'erro';
       t.ultimo_teste_resposta = auth.resposta_crua || auth.mensagem;

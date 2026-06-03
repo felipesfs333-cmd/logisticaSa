@@ -2,6 +2,7 @@ import { Controller, Post, Body, UseGuards, Req } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RegistrarGuard } from './registrar.guard';
+import { CredenciaisDto, RefreshDto } from './auth.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -11,19 +12,19 @@ export class AuthController {
   // Liberado para o primeiro usuario; depois exige login.
   @UseGuards(RegistrarGuard)
   @Post('registrar')
-  registrar(@Body() body: { email: string; senha: string }) {
+  registrar(@Body() body: CredenciaisDto) {
     return this.authService.registrar(body.email, body.senha);
   }
 
   // POST /auth/login  body: { email, senha }
   @Post('login')
-  login(@Body() body: { email: string; senha: string }) {
+  login(@Body() body: CredenciaisDto) {
     return this.authService.login(body.email, body.senha);
   }
 
   // POST /auth/refresh  body: { refresh_token }
   @Post('refresh')
-  refresh(@Body() body: { refresh_token: string }) {
+  refresh(@Body() body: RefreshDto) {
     return this.authService.refresh(body.refresh_token);
   }
 
