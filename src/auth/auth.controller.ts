@@ -1,12 +1,15 @@
 import { Controller, Post, Body, UseGuards, Req } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { RegistrarGuard } from './registrar.guard';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   // POST /auth/registrar  body: { email, senha }
+  // Liberado para o primeiro usuario; depois exige login.
+  @UseGuards(RegistrarGuard)
   @Post('registrar')
   registrar(@Body() body: { email: string; senha: string }) {
     return this.authService.registrar(body.email, body.senha);

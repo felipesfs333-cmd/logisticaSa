@@ -36,6 +36,11 @@ export class AuthService {
     return this.gerarTokens(user);
   }
 
+  // Quantos usuarios existem no sistema (usado pra liberar o 1o cadastro)
+  async totalUsuarios(): Promise<number> {
+    return this.usuarioRepo.count();
+  }
+
   async login(email: string, senha: string) {
     const user = await this.usuarioRepo.findOne({ where: { email } });
     if (!user) throw new UnauthorizedException('Credenciais invalidas.');
