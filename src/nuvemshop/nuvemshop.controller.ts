@@ -6,6 +6,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { CotacaoService } from '../cotacao/cotacao.service';
+import { DiasUteisService } from './dias-uteis.service';
 
 /**
  * Endpoint que a Nuvemshop chama no checkout para obter as taxas de frete.
@@ -16,7 +17,10 @@ import { CotacaoService } from '../cotacao/cotacao.service';
  */
 @Controller('nuvemshop')
 export class NuvemshopController {
-  constructor(private readonly cotacaoService: CotacaoService) {}
+  constructor(
+    private readonly cotacaoService: CotacaoService,
+    private readonly diasUteisService: DiasUteisService,
+  ) {}
 
   // POST /nuvemshop/rates  -> este e o "callback_url" registrado na Nuvemshop
   @Post('rates')
@@ -58,11 +62,12 @@ export class NuvemshopController {
         );
       }
 
-      // Traduz para o formato "rates" da Nuvemshop
-      const hoje = new Date();
+      // Traduz para o formato "rates" da Nuvemshop.
+      // IMPORTANTE: o prazo cadastrado nas tabelas e em DIAS UTEIS
+      // (sabados, domingos e feriados nacionais nao contam).
+      // Alem disso, o prazo nunca conta o dia da compra: comeca de amanha.
       const rates = cotacao.opcoes.map((o: any) => {
-        const entrega = new Date(hoje);
-        entrega.setDate(entrega.getDate() + (o.prazo || 0));
+        const entrega = this.diasUteisService.calcularEntrega(o.prazo || 0);
         return {
           name: o.transportadora + (o.frete_gratis ? ' (Frete grátis)' : ''),
           code: this.slug(o.transportadora),
