@@ -53,7 +53,9 @@ export class DiasUteisService {
    * Calcula a data de entrega somando N dias uteis a partir de AMANHA.
    * @param prazoDias quantidade de dias uteis (>= 0)
    * @param referencia data de referencia (default = hoje). Usado em testes.
-   * @returns Date no fuso local, no inicio do dia (00:00:00)
+   * @returns Date posicionada no MEIO-DIA do horario de Brasilia (UTC-3),
+   *          o que equivale a 15:00 UTC. Usar meio-dia evita off-by-one
+   *          em conversoes de fuso entre o servidor (UTC) e o cliente (BRT).
    */
   calcularEntrega(prazoDias: number, referencia: Date = new Date()): Date {
     // Comeca do dia seguinte (hoje nunca conta, conforme regra de negocio).
@@ -76,8 +78,11 @@ export class DiasUteisService {
       seguranca++;
     }
 
-    // Se meta=0, retorna amanha mesmo (sem deslocamento adicional).
-    // Se ja chegou na meta antes do break, garante que retorna esse dia.
+    // Posiciona em 12h BRT = 15h UTC. Isso garante que a data
+    // permanece a mesma quando interpretada em qualquer fuso entre
+    // UTC-12 e UTC+11, eliminando bug de "chega hoje" causado por
+    // arredondamento de timezone do lado do cliente.
+    data.setUTCHours(15, 0, 0, 0);
     return data;
   }
 
