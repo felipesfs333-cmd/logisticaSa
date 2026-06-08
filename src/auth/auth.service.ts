@@ -84,6 +84,23 @@ export class AuthService {
     await this.usuarioRepo.update(userId, { refresh_hash: null });
     return { ok: true };
   }
+  
+// Lista todos os usuarios (sem dados sensiveis)
+  async listarUsuarios() {
+    const users = await this.usuarioRepo.find({
+      select: ['id', 'email', 'papel'],
+      order: { id: 'ASC' },
+    });
+    return users;
+  }
+
+  // Remove um usuario pelo id
+  async removerUsuario(id: number) {
+    const user = await this.usuarioRepo.findOne({ where: { id } });
+    if (!user) throw new ConflictException('Usuario nao encontrado.');
+    await this.usuarioRepo.delete(id);
+    return { ok: true };
+  }
 
   // Gera access (curto) + refresh (longo) e guarda o hash do refresh
   private async gerarTokens(user: Usuario) {
