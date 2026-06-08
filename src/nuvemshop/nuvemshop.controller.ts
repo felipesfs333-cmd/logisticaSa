@@ -24,6 +24,7 @@ export class NuvemshopController {
 
   // POST /nuvemshop/rates  -> este e o "callback_url" registrado na Nuvemshop
   @Post('rates')
+  @HttpCode(200)
   async rates(@Body() body: any) {
     try {
       console.log('NUVEMSHOP REQUEST:', JSON.stringify(body));
