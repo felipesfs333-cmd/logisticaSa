@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { CotacaoService } from '../cotacao/cotacao.service';
 import { DiasUteisService } from './dias-uteis.service';
+import { NuvemshopHmacGuard } from './nuvemshop-hmac.guard';
 
 /**
  * Endpoint que a Nuvemshop chama no checkout para obter as taxas de frete.
@@ -23,9 +24,12 @@ export class NuvemshopController {
   // POST /nuvemshop/rates  -> este e o "callback_url" registrado na Nuvemshop
   @Post('rates')
   @HttpCode(200)
+  @UseGuards(NuvemshopHmacGuard)
   async rates(@Body() body: any) {
     try {
-      console.log('NUVEMSHOP REQUEST:', JSON.stringify(body));
+      console.log('NUVEMSHOP RATES: destino=%s itens=%d',
+        body?.destination?.postal_code ?? '?',
+        Array.isArray(body?.items) ? body.items.length : 0);
       const destino = body?.destination;
       const itens = body?.items || [];
 
@@ -71,7 +75,7 @@ export class NuvemshopController {
         };
       });
 
-      console.log('NUVEMSHOP RESPONSE:', JSON.stringify({ rates }));
+      console.log('NUVEMSHOP RATES OK: %d opcoes', rates.length);
       return { rates };
     } catch (e) {
       if (e instanceof HttpException) throw e;
