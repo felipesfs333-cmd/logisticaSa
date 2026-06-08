@@ -81,8 +81,14 @@ export class NuvemshopController {
           reference: 'logistica-' + this.slug(o.transportadora),
         };
       });
+      console.log('NUVEMSHOP REQUEST:', JSON.stringify(body));
 
-      return { rates };
+// ... código existente ...
+
+console.log('NUVEMSHOP RESPONSE:', JSON.stringify({ rates }));
+return { rates };
+
+    
     } catch (e) {
       if (e instanceof HttpException) throw e;
       // Erro inesperado tambem vira 4xx para nao penalizar a saude do carrier
