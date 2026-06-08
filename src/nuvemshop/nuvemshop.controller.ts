@@ -11,10 +11,6 @@ import { DiasUteisService } from './dias-uteis.service';
 
 /**
  * Endpoint que a Nuvemshop chama no checkout para obter as taxas de frete.
- * Formato de entrada e saida seguem a doc oficial "Shipping Carrier".
- *
- * IMPORTANTE: a Nuvemshop exige que este endpoint seja HTTPS e publico.
- * Em localhost, use um tunel (ngrok) ou hospede num servidor. Veja o README.
  */
 @Controller('nuvemshop')
 export class NuvemshopController {
@@ -31,8 +27,8 @@ export class NuvemshopController {
       console.log('NUVEMSHOP REQUEST:', JSON.stringify(body));
       const destino = body?.destination;
       const itens = body?.items || [];
+
       if (!destino || !destino.postal_code || itens.length === 0) {
-        // 4xx: a doc recomenda 4xx (nao 5xx) para "nao consigo cotar".
         throw new HttpException(
           { rates: [], motivo: 'Dados insuficientes para cotar.' },
           HttpStatus.UNPROCESSABLE_ENTITY,
@@ -47,9 +43,8 @@ export class NuvemshopController {
         pesoG += (Number(it.grams) || 0) * q;
         valorPedido += (Number(it.price) || 0) * q;
       }
-      const pesoKg = pesoG / 1000 || 0.1; // evita zero
+      const pesoKg = pesoG / 1000 || 0.1;
 
-      // Chama o motor de cotacao interno
       const cotacao = await this.cotacaoService.cotar({
         cep_destino: String(destino.postal_code),
         peso: pesoKg,
@@ -57,17 +52,9 @@ export class NuvemshopController {
       });
 
       if (!cotacao.opcoes || cotacao.opcoes.length === 0) {
-        // Sem cobertura para este CEP -> 4xx (mostra fallback na loja)
-        throw new HttpException(
-          { rates: [] },
-          HttpStatus.UNPROCESSABLE_ENTITY,
-        );
+        throw new HttpException({ rates: [] }, HttpStatus.UNPROCESSABLE_ENTITY);
       }
 
-      // Traduz para o formato "rates" da Nuvemshop.
-      // IMPORTANTE: o prazo cadastrado nas tabelas e em DIAS UTEIS
-      // (sabados, domingos e feriados nacionais nao contam).
-      // Alem disso, o prazo nunca conta o dia da compra: comeca de amanha.
       const rates = cotacao.opcoes.map((o: any) => {
         const entrega = this.diasUteisService.calcularEntrega(o.prazo || 0);
         return {
@@ -77,27 +64,29 @@ export class NuvemshopController {
           price_merchant: o.valor,
           currency: 'BRL',
           type: 'ship',
-          min_delivery_date: entrega.toISOString().split('T')[0], 
-          max_delivery_date: entrega.toISOString().split('T')[0],
+          min_delivery_date: this.formatarDataBR(entrega),
+          max_delivery_date: this.formatarDataBR(entrega),
           reference: 'logistica-' + this.slug(o.transportadora),
         };
       });
-      console.log('NUVEMSHOP REQUEST:', JSON.stringify(body));
 
-// ... código existente ...
-
-console.log('NUVEMSHOP RESPONSE:', JSON.stringify({ rates }));
-return { rates };
-
-    
+      console.log('NUVEMSHOP RESPONSE:', JSON.stringify({ rates }));
+      return { rates };
     } catch (e) {
       if (e instanceof HttpException) throw e;
-      // Erro inesperado tambem vira 4xx para nao penalizar a saude do carrier
       throw new HttpException({ rates: [] }, HttpStatus.UNPROCESSABLE_ENTITY);
     }
   }
 
-  // Gera um code simples e estavel a partir do nome (ex: "Azul Cargo" -> "azul_cargo")
+  // Formata a data em ISO 8601 com fuso de Brasilia (-03:00)
+  private formatarDataBR(data: Date): string {
+    const ano = data.getUTCFullYear();
+    const mes = String(data.getUTCMonth() + 1).padStart(2, '0');
+    const dia = String(data.getUTCDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}T12:00:00-03:00`;
+  }
+
+  // Gera um code simples e estavel a partir do nome
   private slug(nome: string): string {
     return String(nome)
       .toLowerCase()
