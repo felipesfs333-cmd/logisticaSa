@@ -30,7 +30,6 @@ export class NuvemshopController {
       console.log('NUVEMSHOP REQUEST:', JSON.stringify(body));
       const destino = body?.destination;
       const itens = body?.items || [];
-
       if (!destino || !destino.postal_code || itens.length === 0) {
         // 4xx: a doc recomenda 4xx (nao 5xx) para "nao consigo cotar".
         throw new HttpException(
