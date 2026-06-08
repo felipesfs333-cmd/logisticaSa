@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Param, Body, UseGuards, Req } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RegistrarGuard } from './registrar.guard';
@@ -33,5 +33,18 @@ export class AuthController {
   @Post('logout')
   logout(@Req() req: any) {
     return this.authService.logout(req.user.id);
+  }
+  // GET /auth/usuarios  (lista usuarios, precisa estar logado)
+  @UseGuards(JwtAuthGuard)
+  @Get('usuarios')
+  listarUsuarios() {
+    return this.authService.listarUsuarios();
+  }
+
+  // DELETE /auth/usuarios/:id  (remove usuario, precisa estar logado)
+  @UseGuards(JwtAuthGuard)
+  @Delete('usuarios/:id')
+  removerUsuario(@Param('id') id: string) {
+    return this.authService.removerUsuario(Number(id));
   }
 }
