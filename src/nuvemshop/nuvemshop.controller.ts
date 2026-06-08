@@ -5,6 +5,7 @@ import {
   HttpException,
   HttpStatus,
   HttpCode,
+  UseGuards,
 } from '@nestjs/common';
 import { CotacaoService } from '../cotacao/cotacao.service';
 import { DiasUteisService } from './dias-uteis.service';
