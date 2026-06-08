@@ -26,6 +26,7 @@ export class NuvemshopController {
   @Post('rates')
   async rates(@Body() body: any) {
     try {
+      console.log('NUVEMSHOP REQUEST:', JSON.stringify(body));
       const destino = body?.destination;
       const itens = body?.items || [];
 
