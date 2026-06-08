@@ -75,8 +75,8 @@ export class NuvemshopController {
           price_merchant: o.valor,
           currency: 'BRL',
           type: 'ship',
-          min_delivery_date: entrega.toISOString(),
-          max_delivery_date: entrega.toISOString(),
+          min_delivery_date: entrega.toISOString().split('T')[0], 
+          max_delivery_date: entrega.toISOString().split('T')[0],
           reference: 'logistica-' + this.slug(o.transportadora),
         };
       });
