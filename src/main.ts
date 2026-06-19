@@ -1,10 +1,17 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { json, urlencoded } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
+
+  // Limite de payload elevado (necessario para upload de planilhas
+  // de frete grandes - 70k+ linhas, ~2-5MB - via multipart/form-data).
+  // Sem isso o Express corta a conexao no meio do envio.
+  app.use(json({ limit: '25mb' }));
+  app.use(urlencoded({ limit: '25mb', extended: true }));
 
   // Headers de seguranca (item 7)
   app.use(helmet());
